@@ -11,11 +11,6 @@ interface HeroProps {
 export default function Hero({ searchQuery, onSearchChange }: HeroProps) {
   return (
     <section className="relative pt-32 pb-16 sm:pt-40 sm:pb-20 overflow-hidden">
-      {/* Background Orbs */}
-      <div className="hero-orb w-[500px] h-[500px] bg-indigo-500/10 top-[-100px] left-1/2 -translate-x-1/2" />
-      <div className="hero-orb w-[300px] h-[300px] bg-purple-500/8 top-[50px] right-[-50px]" />
-      <div className="hero-orb w-[200px] h-[200px] bg-pink-500/6 bottom-[0px] left-[-50px]" />
-
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 text-center">
         {/* Badge */}
         <motion.div
@@ -61,7 +56,7 @@ export default function Hero({ searchQuery, onSearchChange }: HeroProps) {
         >
           <div className="relative group">
             <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative flex items-center bg-card border border-border rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden">
+            <div className="relative flex items-center bg-card/80 backdrop-blur-md border border-border rounded-xl shadow-lg shadow-black/5 dark:shadow-black/20 overflow-hidden">
               <Search
                 size={18}
                 className="ml-4 text-muted-foreground shrink-0"
