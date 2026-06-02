@@ -182,22 +182,19 @@ body {
   color: #e5e5e5;
   border: 1px solid #ffffff15;
 }
-/* ====== ANIMATED GRID ====== */
+/* ====== ANIMATED GRID (CSS only, ringan) ====== */
 .grid-animate {
   background-size: 60px 60px;
   background-image:
     linear-gradient(to right, rgba(99, 102, 241, 0.5) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(99, 102, 241, 0.5) 1px, transparent 1px);
-  animation: gridMove 20s linear infinite;
+  animation: gridMove 25s linear infinite;
+  will-change: transform;
 }
 
 @keyframes gridMove {
-  0% {
-    transform: translate(0, 0);
-  }
-  100% {
-    transform: translate(60px, 60px);
-  }
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(60px, 60px); }
 }
 
 /* ====== VIGNETTE ====== */
@@ -205,7 +202,7 @@ body {
   background: radial-gradient(
     ellipse at center,
     transparent 50%,
-    rgba(0, 0, 0, 0.15) 100%
+    rgba(0, 0, 0, 0.12) 100%
   );
 }
 
@@ -213,85 +210,48 @@ body {
   background: radial-gradient(
     ellipse at center,
     transparent 40%,
-    rgba(0, 0, 0, 0.4) 100%
+    rgba(0, 0, 0, 0.35) 100%
   );
 }
 
-/* ====== SCANNING LINE ====== */
-.scan-line {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
-  animation: scanDown 8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 2;
-}
-
-@keyframes scanDown {
-  0% { top: -1px; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100vh; opacity: 0; }
-}
-
-/* ====== GLOWING CORNERS ====== */
+/* ====== GLOWING CORNERS (CSS only) ====== */
 .glow-corner::before,
 .glow-corner::after {
   content: "";
   position: fixed;
-  width: 200px;
-  height: 200px;
+  width: 180px;
+  height: 180px;
   border-radius: 50%;
   filter: blur(100px);
   pointer-events: none;
   z-index: 0;
+  will-change: opacity, transform;
 }
 
 .glow-corner::before {
   top: -50px;
   right: -50px;
-  background: rgba(99, 102, 241, 0.08);
-  animation: cornerPulse 6s ease-in-out infinite;
+  background: rgba(99, 102, 241, 0.06);
+  animation: cornerPulse 8s ease-in-out infinite;
 }
 
 .glow-corner::after {
   bottom: -50px;
   left: -50px;
-  background: rgba(168, 85, 247, 0.06);
-  animation: cornerPulse 6s ease-in-out infinite 3s;
+  background: rgba(168, 85, 247, 0.05);
+  animation: cornerPulse 8s ease-in-out infinite 4s;
 }
 
 @keyframes cornerPulse {
   0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.2); }
+  50% { opacity: 1; transform: scale(1.15); }
 }
 
-/* ====== FLOATING MINI DOTS ====== */
-@keyframes floatDot {
-  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; }
-  25% { transform: translateY(-15px) rotate(90deg); opacity: 0.6; }
-  50% { transform: translateY(-5px) rotate(180deg); opacity: 0.2; }
-  75% { transform: translateY(-20px) rotate(270deg); opacity: 0.5; }
+/* ====== REDUCED MOTION: matikan semua animasi ====== */
+@media (prefers-reduced-motion: reduce) {
+  .grid-animate { animation: none; }
+  .glow-corner::before,
+  .glow-corner::after { animation: none; }
+  .scan-line { display: none; }
+  .mini-dot { display: none; }
 }
-
-.mini-dot {
-  position: fixed;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(99, 102, 241, 0.4);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.mini-dot:nth-child(1) { top: 10%; left: 5%; animation: floatDot 7s ease-in-out infinite; }
-.mini-dot:nth-child(2) { top: 25%; left: 90%; animation: floatDot 9s ease-in-out infinite 1s; }
-.mini-dot:nth-child(3) { top: 50%; left: 3%; animation: floatDot 8s ease-in-out infinite 2s; }
-.mini-dot:nth-child(4) { top: 70%; left: 92%; animation: floatDot 6s ease-in-out infinite 0.5s; }
-.mini-dot:nth-child(5) { top: 85%; left: 15%; animation: floatDot 10s ease-in-out infinite 3s; }
-.mini-dot:nth-child(6) { top: 15%; left: 75%; animation: floatDot 7.5s ease-in-out infinite 1.5s; background: rgba(168, 85, 247, 0.3); }
-.mini-dot:nth-child(7) { top: 45%; left: 50%; animation: floatDot 8.5s ease-in-out infinite 2.5s; background: rgba(236, 72, 153, 0.3); }
-.mini-dot:nth-child(8) { top: 90%; left: 60%; animation: floatDot 6.5s ease-in-out infinite 4s; background: rgba(6, 182, 212, 0.3); }
