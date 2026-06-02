@@ -9,7 +9,7 @@ import CategoryFilter from "./components/category-filter";
 import PromptGrid from "./components/prompt-grid";
 import Footer from "./components/footer";
 import SubmitModal from "./components/submit-modal";
-import { prompts as seedPrompts } from "@/data/prompts";
+import { prompts as seedPrompts, platforms as platformList } from "@/data/prompts";
 import type { Prompt } from "@/data/prompts";
 
 export default function Home() {
@@ -21,7 +21,12 @@ export default function Home() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Load from localStorage
+  // Kategori selalu dari daftar platform statis
+  const categories = useMemo(() => {
+    return ["Semua", ...platformList];
+  }, []);
+
+  // Load dari localStorage
   useEffect(() => {
     try {
       const liked = localStorage.getItem("babeh_liked_prompts");
@@ -32,25 +37,17 @@ export default function Home() {
       if (saved) setSavedPrompts(new Set(JSON.parse(saved)));
       if (custom) {
         const parsed = JSON.parse(custom);
-        setAllPrompts((prev) => [...parsed, ...prev]);
+        setAllPrompts(parsed);
       }
     } catch {}
   }, []);
 
-  // Save likes to localStorage
   useEffect(() => {
-    localStorage.setItem(
-      "babeh_liked_prompts",
-      JSON.stringify([...likedPrompts])
-    );
+    localStorage.setItem("babeh_liked_prompts", JSON.stringify([...likedPrompts]));
   }, [likedPrompts]);
 
-  // Save bookmarks to localStorage
   useEffect(() => {
-    localStorage.setItem(
-      "babeh_saved_prompts",
-      JSON.stringify([...savedPrompts])
-    );
+    localStorage.setItem("babeh_saved_prompts", JSON.stringify([...savedPrompts]));
   }, [savedPrompts]);
 
   const showToast = (msg: string) => {
@@ -102,17 +99,14 @@ export default function Home() {
       likes: 0,
       createdAt: new Date().toISOString(),
     };
-    setAllPrompts((prev) => [newPrompt, ...prev]);
-
-    // Save custom prompts
-    try {
-      const custom = allPrompts.filter((p) => p.id.startsWith("custom-"));
-      localStorage.setItem(
-        "babeh_custom_prompts",
-        JSON.stringify([newPrompt, ...custom])
-      );
-    } catch {}
-
+    setAllPrompts((prev) => {
+      const updated = [newPrompt, ...prev];
+      // Simpan custom prompts ke localStorage
+      try {
+        localStorage.setItem("babeh_custom_prompts", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
     setShowSubmitModal(false);
     showToast("Prompt berhasil ditambahkan! 🎉");
   };
@@ -133,9 +127,10 @@ export default function Home() {
     });
   }, [allPrompts, searchQuery, activeCategory]);
 
-  const uniquePlatforms = useMemo(() => {
-    const platforms = new Set(allPrompts.map((p) => p.platform));
-    return ["Semua", ...Array.from(platforms)];
+  // Hitung jumlah prompt per platform (untuk stats)
+  const usedPlatforms = useMemo(() => {
+    const set = new Set(allPrompts.map((p) => p.platform));
+    return set.size;
   }, [allPrompts]);
 
   return (
@@ -144,11 +139,11 @@ export default function Home() {
       <Hero searchQuery={searchQuery} onSearchChange={setSearchQuery} />
       <Stats
         totalPrompts={allPrompts.length}
-        totalPlatforms={uniquePlatforms.length - 1}
-        totalCategories={uniquePlatforms.length - 1}
+        totalPlatforms={platformList.length}
+        totalCategories={platformList.length}
       />
       <CategoryFilter
-        categories={uniquePlatforms}
+        categories={categories}
         active={activeCategory}
         onSelect={setActiveCategory}
       />
@@ -159,6 +154,7 @@ export default function Home() {
         onLike={toggleLike}
         onSave={toggleSave}
         onCopy={copyPrompt}
+        onOpenSubmit={() => setShowSubmitModal(true)}
       />
       <Footer onOpenSubmit={() => setShowSubmitModal(true)} />
 
@@ -171,7 +167,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
