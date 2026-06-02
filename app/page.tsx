@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Header from "./components/header";
 import Hero from "./components/hero";
@@ -10,7 +10,8 @@ import PromptGrid from "./components/prompt-grid";
 import Footer from "./components/footer";
 import SubmitModal from "./components/submit-modal";
 import BackgroundEffects from "./components/background-effects";
-import { prompts as seedPrompts, platforms as platformList } from "@/data/prompts";
+import { platforms as platformList } from "@/data/prompts";
+import { supabase, getFingerprint } from "@/lib/supabase";
 import type { Prompt } from "@/data/prompts";
 
 export default function Home() {
@@ -18,70 +19,137 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState("Semua");
   const [likedPrompts, setLikedPrompts] = useState<Set<string>>(new Set());
   const [savedPrompts, setSavedPrompts] = useState<Set<string>>(new Set());
-  const [allPrompts, setAllPrompts] = useState<Prompt[]>(seedPrompts);
+  const [allPrompts, setAllPrompts] = useState<Prompt[]>([]);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const categories = useMemo(() => {
-    return ["Semua", ...platformList];
+  const categories = useMemo(() => ["Semua", ...platformList], []);
+
+  // ===== FETCH PROMPTS DARI SUPABASE =====
+  const fetchPrompts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("prompts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const mapped: Prompt[] = (data || []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        content: p.content,
+        platform: p.platform,
+        author: p.author,
+        likes: p.likes || 0,
+        createdAt: p.created_at,
+      }));
+
+      setAllPrompts(mapped);
+    } catch {
+      // Fallback: kosongkan, user bisa add baru
+      setAllPrompts([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
-    try {
-      const liked = localStorage.getItem("babeh_liked_prompts");
-      const saved = localStorage.getItem("babeh_saved_prompts");
-      const custom = localStorage.getItem("babeh_custom_prompts");
+  // ===== FETCH LIKES & SAVES DARI SUPABASE =====
+  const fetchUserInteractions = useCallback(async () => {
+    const fp = getFingerprint();
+    if (!fp) return;
 
-      if (liked) setLikedPrompts(new Set(JSON.parse(liked)));
-      if (saved) setSavedPrompts(new Set(JSON.parse(saved)));
-      if (custom) {
-        const parsed = JSON.parse(custom);
-        setAllPrompts(parsed);
+    try {
+      const [likesRes, savesRes] = await Promise.all([
+        supabase.from("prompt_likes").select("prompt_id").eq("user_fingerprint", fp),
+        supabase.from("prompt_saves").select("prompt_id").eq("user_fingerprint", fp),
+      ]);
+
+      if (likesRes.data) {
+        setLikedPrompts(new Set(likesRes.data.map((l: any) => l.prompt_id)));
+      }
+      if (savesRes.data) {
+        setSavedPrompts(new Set(savesRes.data.map((s: any) => s.prompt_id)));
       }
     } catch {}
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("babeh_liked_prompts", JSON.stringify([...likedPrompts]));
-  }, [likedPrompts]);
-
-  useEffect(() => {
-    localStorage.setItem("babeh_saved_prompts", JSON.stringify([...savedPrompts]));
-  }, [savedPrompts]);
+    fetchPrompts();
+    fetchUserInteractions();
+  }, [fetchPrompts, fetchUserInteractions]);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
 
-  const toggleLike = (id: string) => {
+  // ===== LIKE / UNLIKE =====
+  const toggleLike = async (id: string) => {
+    const fp = getFingerprint();
+    if (!fp) return;
+
+    const isLiked = likedPrompts.has(id);
     setLikedPrompts((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (isLiked) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+    try {
+      if (isLiked) {
+        await supabase.from("prompt_likes").delete().eq("prompt_id", id).eq("user_fingerprint", fp);
+        // Kurangi likes count
+        const prompt = allPrompts.find((p) => p.id === id);
+        if (prompt) {
+          await supabase.from("prompts").update({ likes: Math.max(0, prompt.likes - 1) }).eq("id", id);
+        }
         showToast("Unlike berhasil");
       } else {
-        next.add(id);
+        await supabase.from("prompt_likes").insert({ prompt_id: id, user_fingerprint: fp });
+        const prompt = allPrompts.find((p) => p.id === id);
+        if (prompt) {
+          await supabase.from("prompts").update({ likes: prompt.likes + 1 }).eq("id", id);
+        }
         showToast("Prompt disukai! ❤️");
       }
-      return next;
-    });
+      // Refresh data
+      fetchPrompts();
+    } catch {
+      showToast("Gagal update like");
+    }
   };
 
-  const toggleSave = (id: string) => {
+  // ===== SAVE / UNSAVE =====
+  const toggleSave = async (id: string) => {
+    const fp = getFingerprint();
+    if (!fp) return;
+
+    const isSaved = savedPrompts.has(id);
     setSavedPrompts((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        showToast("Dihapus dari simpanan");
-      } else {
-        next.add(id);
-        showToast("Prompt disimpan! 📌");
-      }
+      if (isSaved) next.delete(id);
+      else next.add(id);
       return next;
     });
+
+    try {
+      if (isSaved) {
+        await supabase.from("prompt_saves").delete().eq("prompt_id", id).eq("user_fingerprint", fp);
+        showToast("Dihapus dari simpanan");
+      } else {
+        await supabase.from("prompt_saves").insert({ prompt_id: id, user_fingerprint: fp });
+        showToast("Prompt disimpan! 📌");
+      }
+    } catch {
+      showToast("Gagal update simpanan");
+    }
   };
 
+  // ===== COPY =====
   const copyPrompt = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -91,24 +159,46 @@ export default function Home() {
     }
   };
 
-  const handleAddPrompt = (prompt: Omit<Prompt, "id" | "likes" | "createdAt">) => {
-    const newPrompt: Prompt = {
-      ...prompt,
-      id: `custom-${Date.now()}`,
-      likes: 0,
-      createdAt: new Date().toISOString(),
-    };
-    setAllPrompts((prev) => {
-      const updated = [newPrompt, ...prev];
-      try {
-        localStorage.setItem("babeh_custom_prompts", JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-    setShowSubmitModal(false);
-    showToast("Prompt berhasil ditambahkan! 🎉");
+  // ===== SUBMIT PROMPT KE SUPABASE =====
+  const handleAddPrompt = async (prompt: Omit<Prompt, "id" | "likes" | "createdAt">) => {
+    try {
+      const { data, error } = await supabase
+        .from("prompts")
+        .insert({
+          title: prompt.title,
+          description: prompt.description,
+          content: prompt.content,
+          platform: prompt.platform,
+          author: prompt.author,
+          likes: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setAllPrompts((prev) => [
+        {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          content: data.content,
+          platform: data.platform,
+          author: data.author,
+          likes: 0,
+          createdAt: data.created_at,
+        },
+        ...prev,
+      ]);
+
+      setShowSubmitModal(false);
+      showToast("Prompt berhasil ditambahkan! 🎉");
+    } catch {
+      showToast("Gagal menambahkan prompt");
+    }
   };
 
+  // ===== FILTER & SEARCH =====
   const filteredPrompts = useMemo(() => {
     return allPrompts.filter((p) => {
       const matchSearch =
@@ -127,23 +217,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen glow-corner relative">
-      {/* Background Effects */}
       <BackgroundEffects />
 
-      {/* Scan Line */}
-      <div className="scan-line" />
-
-      {/* Floating Mini Dots */}
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-      <div className="mini-dot" />
-
-      {/* Content (di atas background) */}
       <div className="relative" style={{ zIndex: 10 }}>
         <Header onOpenSubmit={() => setShowSubmitModal(true)} />
         <Hero searchQuery={searchQuery} onSearchChange={setSearchQuery} />
@@ -157,19 +232,29 @@ export default function Home() {
           active={activeCategory}
           onSelect={setActiveCategory}
         />
-        <PromptGrid
-          prompts={filteredPrompts}
-          likedPrompts={likedPrompts}
-          savedPrompts={savedPrompts}
-          onLike={toggleLike}
-          onSave={toggleSave}
-          onCopy={copyPrompt}
-          onOpenSubmit={() => setShowSubmitModal(true)}
-        />
+
+        {loading ? (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-muted-foreground">Memuat prompts...</p>
+            </div>
+          </div>
+        ) : (
+          <PromptGrid
+            prompts={filteredPrompts}
+            likedPrompts={likedPrompts}
+            savedPrompts={savedPrompts}
+            onLike={toggleLike}
+            onSave={toggleSave}
+            onCopy={copyPrompt}
+            onOpenSubmit={() => setShowSubmitModal(true)}
+          />
+        )}
+
         <Footer onOpenSubmit={() => setShowSubmitModal(true)} />
       </div>
 
-      {/* Submit Modal */}
       <AnimatePresence>
         {showSubmitModal && (
           <SubmitModal
@@ -179,7 +264,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
