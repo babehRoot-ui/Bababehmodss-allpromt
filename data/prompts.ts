@@ -9,7 +9,4 @@ export interface Prompt {
   createdAt: string;
 }
 
-export const prompts: Prompt[] = [
-  { 
-  },
-];
+export const prompts: Prompt[] = [];
