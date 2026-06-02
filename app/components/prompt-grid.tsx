@@ -63,7 +63,7 @@ export default function PromptGrid({
           )}
 
           <p className="text-[11px] text-muted-foreground/50 mt-6">
-            Prompt yang ditambahkan akan tersimpan di browser kamu
+            Data tersimpan di Supabase — bisa diakses dari mana saja
           </p>
         </motion.div>
       </div>
