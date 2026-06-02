@@ -20,20 +20,19 @@ function FloatingOrb({
 }) {
   return (
     <motion.div
-      className="absolute rounded-full pointer-events-none"
+      className="absolute rounded-full pointer-events-none will-change-transform"
       style={{
         width: size,
         height: size,
         background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
         top,
         left,
-        filter: "blur(80px)",
+        filter: "blur(100px)",
       }}
       animate={{
-        y: [0, -40, 20, -30, 0],
-        x: [0, 20, -15, 25, 0],
-        scale: [1, 1.1, 0.95, 1.05, 1],
-        opacity: [0.4, 0.6, 0.35, 0.55, 0.4],
+        y: [0, -30, 15, -20, 0],
+        x: [0, 15, -10, 20, 0],
+        scale: [1, 1.05, 0.97, 1.03, 1],
       }}
       transition={{
         duration,
@@ -52,8 +51,14 @@ function Particles() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
+
+    // Cek reduced motion preference
+    const prefersReduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (prefersReduced) return;
 
     let animationId: number;
     let particles: Array<{
@@ -72,17 +77,18 @@ function Particles() {
     };
 
     const initParticles = () => {
-      const count = Math.floor((canvas.width * canvas.height) / 18000);
+      // Dikurangi drastis: ~30 partikel (bukan ~100)
+      const count = Math.min(Math.floor((canvas.width * canvas.height) / 50000), 40);
       particles = [];
       for (let i = 0; i < count; i++) {
         particles.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          size: Math.random() * 1.5 + 0.5,
-          opacity: Math.random() * 0.5 + 0.1,
-          opacityDir: Math.random() > 0.5 ? 0.003 : -0.003,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: (Math.random() - 0.5) * 0.2,
+          size: Math.random() * 1.2 + 0.4,
+          opacity: Math.random() * 0.4 + 0.1,
+          opacityDir: Math.random() > 0.5 ? 0.002 : -0.002,
         });
       }
     };
@@ -90,12 +96,13 @@ function Particles() {
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Hanya render partikel, TANPA connection lines (paling berat)
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
         p.opacity += p.opacityDir;
 
-        if (p.opacity <= 0.05 || p.opacity >= 0.6) {
+        if (p.opacity <= 0.05 || p.opacity >= 0.5) {
           p.opacityDir *= -1;
         }
 
@@ -109,25 +116,6 @@ function Particles() {
         ctx.fillStyle = `rgba(99, 102, 241, ${p.opacity})`;
         ctx.fill();
       });
-
-      // Draw connections
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-
-          if (dist < 120) {
-            const lineOpacity = (1 - dist / 120) * 0.08;
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(99, 102, 241, ${lineOpacity})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      }
 
       animationId = requestAnimationFrame(animate);
     };
@@ -143,7 +131,6 @@ function Particles() {
 
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resize);
     };
   }, []);
 
@@ -156,117 +143,51 @@ function Particles() {
   );
 }
 
-function AuroraLine({
-  top,
-  color,
-  delay,
-  duration,
-  rotate,
-}: {
-  top: string;
-  color: string;
-  delay: number;
-  duration: number;
-  rotate: number;
-}) {
-  return (
-    <motion.div
-      className="absolute left-0 right-0 pointer-events-none"
-      style={{
-        top,
-        height: "2px",
-        background: `linear-gradient(90deg, transparent 0%, ${color} 30%, ${color} 70%, transparent 100%)`,
-        filter: "blur(4px)",
-        transform: `rotate(${rotate}deg)`,
-        opacity: 0,
-      }}
-      animate={{
-        opacity: [0, 0.3, 0.5, 0.3, 0],
-        x: ["-10%", "0%", "10%", "0%", "-10%"],
-      }}
-      transition={{
-        duration,
-        delay,
-        repeat: Infinity,
-        ease: "easeInOut",
-      }}
-    />
-  );
-}
-
 export default function BackgroundEffects() {
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
+    <div
+      className="fixed inset-0 overflow-hidden pointer-events-none"
+      style={{ zIndex: 0 }}
+    >
       {/* Base gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background" />
 
-      {/* Animated grid */}
-      <div className="absolute inset-0 grid-animate opacity-[0.03] dark:opacity-[0.05]" />
+      {/* Animated grid - ringan, pakai CSS saja */}
+      <div className="absolute inset-0 grid-animate opacity-[0.025] dark:opacity-[0.04]" />
 
-      {/* Floating gradient orbs */}
+      {/* Hanya 3 orb (bukan 6) */}
       <FloatingOrb
-        size={500}
-        color="rgba(99, 102, 241, 0.15)"
-        top="-10%"
-        left="20%"
+        size={450}
+        color="rgba(99, 102, 241, 0.12)"
+        top="-5%"
+        left="25%"
         delay={0}
-        duration={20}
-      />
-      <FloatingOrb
-        size={400}
-        color="rgba(168, 85, 247, 0.12)"
-        top="30%"
-        left="60%"
-        delay={3}
-        duration={25}
-      />
-      <FloatingOrb
-        size={350}
-        color="rgba(236, 72, 153, 0.1)"
-        top="60%"
-        left="10%"
-        delay={6}
         duration={22}
       />
       <FloatingOrb
-        size={300}
-        color="rgba(6, 182, 212, 0.1)"
-        top="70%"
-        left="70%"
-        delay={9}
-        duration={18}
-      />
-      <FloatingOrb
-        size={250}
-        color="rgba(99, 102, 241, 0.08)"
-        top="10%"
-        left="80%"
-        delay={2}
-        duration={23}
-      />
-      <FloatingOrb
-        size={200}
+        size={350}
         color="rgba(168, 85, 247, 0.1)"
-        top="80%"
-        left="40%"
-        delay={5}
-        duration={19}
+        top="40%"
+        left="65%"
+        delay={4}
+        duration={26}
+      />
+      <FloatingOrb
+        size={300}
+        color="rgba(236, 72, 153, 0.08)"
+        top="65%"
+        left="15%"
+        delay={8}
+        duration={24}
       />
 
-      {/* Aurora lines */}
-      <AuroraLine top="15%" color="rgba(99, 102, 241, 0.6)" delay={0} duration={8} rotate={-1} />
-      <AuroraLine top="35%" color="rgba(168, 85, 247, 0.5)" delay={2} duration={10} rotate={0.5} />
-      <AuroraLine top="55%" color="rgba(236, 72, 153, 0.4)" delay={4} duration={9} rotate={-0.5} />
-      <AuroraLine top="75%" color="rgba(6, 182, 212, 0.4)" delay={6} duration={11} rotate={0.8} />
-      <AuroraLine top="90%" color="rgba(99, 102, 241, 0.3)" delay={1} duration={7} rotate={-0.3} />
-
-      {/* Particles canvas */}
+      {/* Particles - dioptimasi */}
       <Particles />
 
-      {/* Vignette overlay */}
+      {/* Vignette */}
       <div className="absolute inset-0 vignette" />
 
-      {/* Top fade (untuk header area) */}
+      {/* Top fade */}
       <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-background/80 to-transparent" />
     </div>
   );
