@@ -9,6 +9,7 @@ import CategoryFilter from "./components/category-filter";
 import PromptGrid from "./components/prompt-grid";
 import Footer from "./components/footer";
 import SubmitModal from "./components/submit-modal";
+import BackgroundEffects from "./components/background-effects";
 import { prompts as seedPrompts, platforms as platformList } from "@/data/prompts";
 import type { Prompt } from "@/data/prompts";
 
@@ -21,12 +22,10 @@ export default function Home() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Kategori selalu dari daftar platform statis
   const categories = useMemo(() => {
     return ["Semua", ...platformList];
   }, []);
 
-  // Load dari localStorage
   useEffect(() => {
     try {
       const liked = localStorage.getItem("babeh_liked_prompts");
@@ -101,7 +100,6 @@ export default function Home() {
     };
     setAllPrompts((prev) => {
       const updated = [newPrompt, ...prev];
-      // Simpan custom prompts ke localStorage
       try {
         localStorage.setItem("babeh_custom_prompts", JSON.stringify(updated));
       } catch {}
@@ -127,37 +125,51 @@ export default function Home() {
     });
   }, [allPrompts, searchQuery, activeCategory]);
 
-  // Hitung jumlah prompt per platform (untuk stats)
-  const usedPlatforms = useMemo(() => {
-    const set = new Set(allPrompts.map((p) => p.platform));
-    return set.size;
-  }, [allPrompts]);
-
   return (
-    <div className="min-h-screen grid-bg">
-      <Header onOpenSubmit={() => setShowSubmitModal(true)} />
-      <Hero searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-      <Stats
-        totalPrompts={allPrompts.length}
-        totalPlatforms={platformList.length}
-        totalCategories={platformList.length}
-      />
-      <CategoryFilter
-        categories={categories}
-        active={activeCategory}
-        onSelect={setActiveCategory}
-      />
-      <PromptGrid
-        prompts={filteredPrompts}
-        likedPrompts={likedPrompts}
-        savedPrompts={savedPrompts}
-        onLike={toggleLike}
-        onSave={toggleSave}
-        onCopy={copyPrompt}
-        onOpenSubmit={() => setShowSubmitModal(true)}
-      />
-      <Footer onOpenSubmit={() => setShowSubmitModal(true)} />
+    <div className="min-h-screen glow-corner relative">
+      {/* Background Effects */}
+      <BackgroundEffects />
 
+      {/* Scan Line */}
+      <div className="scan-line" />
+
+      {/* Floating Mini Dots */}
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+      <div className="mini-dot" />
+
+      {/* Content (di atas background) */}
+      <div className="relative" style={{ zIndex: 10 }}>
+        <Header onOpenSubmit={() => setShowSubmitModal(true)} />
+        <Hero searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+        <Stats
+          totalPrompts={allPrompts.length}
+          totalPlatforms={platformList.length}
+          totalCategories={platformList.length}
+        />
+        <CategoryFilter
+          categories={categories}
+          active={activeCategory}
+          onSelect={setActiveCategory}
+        />
+        <PromptGrid
+          prompts={filteredPrompts}
+          likedPrompts={likedPrompts}
+          savedPrompts={savedPrompts}
+          onLike={toggleLike}
+          onSave={toggleSave}
+          onCopy={copyPrompt}
+          onOpenSubmit={() => setShowSubmitModal(true)}
+        />
+        <Footer onOpenSubmit={() => setShowSubmitModal(true)} />
+      </div>
+
+      {/* Submit Modal */}
       <AnimatePresence>
         {showSubmitModal && (
           <SubmitModal
@@ -167,6 +179,7 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
